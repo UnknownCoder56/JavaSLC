@@ -38,4 +38,5 @@ build/
 ### Mac OS ###
 .DS_Store
 
-/src/main/java/com/uniqueapps/javaslc/TestBot.java
+/src/main/java/io/github/unknowncoder56/javaslc/TestBot.java
+/.idea/

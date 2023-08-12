@@ -1,4 +1,4 @@
-package com.uniqueapps.javaslc;
+package io.github.unknowncoder56.javaslc;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
