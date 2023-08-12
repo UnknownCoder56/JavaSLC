@@ -2,6 +2,8 @@ package io.github.unknowncoder56.javaslc;
 
 import com.google.gson.JsonObject;
 
+import java.util.concurrent.CompletableFuture;
+
 public class MessageContext {
 
     private final String content;
@@ -29,8 +31,8 @@ public class MessageContext {
         this.arguments = arguments;
     }
 
-    public void send(String message) {
-        bot.send(message, serverId);
+    public CompletableFuture<Void> send(String message) {
+        return bot.send(message, serverId);
     }
 
     public String getContent() {
