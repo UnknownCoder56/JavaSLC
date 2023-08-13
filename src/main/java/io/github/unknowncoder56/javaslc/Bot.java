@@ -8,9 +8,7 @@ import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.http.message.BasicNameValuePair;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -29,6 +27,7 @@ public class Bot extends User {
     private final ArrayList<MessageListener> messageListeners;
     private final ArrayList<CommandListener> commandListeners;
     private final ArrayList<Long> serverIds = new ArrayList<>();
+    private final Map<Long, String> latestMessageTimesPerServer = new HashMap<>();
 
     /**
      * The enum containing all possible property change keys.
@@ -114,6 +113,15 @@ public class Bot extends User {
                     String responseJsonString = Request.get("https://chat.slsearch.eu.org/api/server/" + serverId + "/").execute().returnContent().asString();
                     JsonArray messages = JsonParser.parseString(responseJsonString).getAsJsonObject().get("messages").getAsJsonArray();
                     JsonObject latestMessage = messages.get(messages.size() - 1).getAsJsonObject();
+                    if (latestMessageTimesPerServer.containsKey(serverId)) {
+                        if (!Objects.equals(latestMessageTimesPerServer.get(serverId), latestMessage.get("date").getAsString())) {
+                            latestMessageTimesPerServer.replace(serverId, latestMessage.get("date").getAsString());
+                        } else {
+                            continue;
+                        }
+                    } else {
+                        latestMessageTimesPerServer.put(serverId, latestMessage.get("date").getAsString());
+                    }
                     if (!Objects.equals(latestMessage.get("owner").getAsString(), String.valueOf(userId))) {
                         if (latestMessage.get("content").getAsString().startsWith(prefix)) {
                             String[] commandParts = latestMessage.get("content").getAsString().split(" ");
