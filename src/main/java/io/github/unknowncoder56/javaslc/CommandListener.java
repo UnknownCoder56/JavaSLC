@@ -7,8 +7,8 @@ public interface CommandListener {
 
     /**
      * Method to implement for receiving command events.
-     * @param context The {@link MessageContext} of the message.
-     * @see MessageContext
+     * @param context The {@link CommandContext} of the message.
+     * @see CommandContext
      */
-    void onCommand(MessageContext context);
+    void onCommand(CommandContext context);
 }

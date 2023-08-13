@@ -12,6 +12,7 @@ public class BotBuilder {
     private ErrorListener errorListener = null;
     private String token = "";
     private long botUserId = 0;
+    private final ArrayList<MessageListener> messageListeners = new ArrayList<>();
     private final ArrayList<CommandListener> commandListeners = new ArrayList<>();
 
     /**
@@ -83,6 +84,17 @@ public class BotBuilder {
     }
 
     /**
+     * Adds a message listener.
+     * @param messageListener The message listener.
+     * @return The {@link BotBuilder} instance to facilitate chaining of method calls.
+     * @see MessageListener
+     */
+    public BotBuilder addMessageListener(MessageListener messageListener) {
+        messageListeners.add(messageListener);
+        return this;
+    }
+
+    /**
      * Adds a command listener.
      * @param commandListener The command listener.
      * @return The {@link BotBuilder} instance to facilitate chaining of method calls.
@@ -98,6 +110,6 @@ public class BotBuilder {
      * @return A {@link Bot} instance constructed with the specified values.
      */
     public Bot build() {
-        return new Bot(prefix, startListener, errorListener, token, botUserId, commandListeners);
+        return new Bot(prefix, startListener, errorListener, token, botUserId, messageListeners, commandListeners);
     }
 }

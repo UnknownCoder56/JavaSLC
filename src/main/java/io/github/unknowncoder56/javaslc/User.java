@@ -14,7 +14,14 @@ import java.util.concurrent.CompletableFuture;
  */
 public class User {
 
+    /**
+     * The user ID of the user.
+     */
     protected final long userId;
+
+    /**
+     * The {@link ErrorListener} for the instance.
+     */
     protected ErrorListener errorListener;
 
     /**
@@ -59,9 +66,7 @@ public class User {
     public CompletableFuture<LocalDateTime> getAccountCreationDate() {
         return CompletableFuture.supplyAsync(() -> {
             try {
-                String responseJsonString = Request.get("https://chat.slsearch.eu.org/api/user/" + userId + "/").execute().returnContent().asString();
-                JsonObject responseJson = JsonParser.parseString(responseJsonString).getAsJsonObject();
-                return LocalDateTime.parse(responseJson.get("creation_date").getAsString());
+                return LocalDateTime.parse(getUserDetailsJsonObject().get("creation_date").getAsString());
             } catch (IOException e) {
                 if (errorListener != null) {
                     errorListener.onError(e, "getAccountCreationDate");
@@ -79,9 +84,7 @@ public class User {
     public CompletableFuture<JsonObject> getLabelJsonObject() {
         return CompletableFuture.supplyAsync(() -> {
             try {
-                String responseJsonString = Request.get("https://chat.slsearch.eu.org/api/user/" + userId + "/").execute().returnContent().asString();
-                JsonObject responseJson = JsonParser.parseString(responseJsonString).getAsJsonObject();
-                return responseJson.get("label").getAsJsonObject();
+                return getUserDetailsJsonObject().get("label").getAsJsonObject();
             } catch (IOException e) {
                 if (errorListener != null) {
                     errorListener.onError(e, "getLabelJsonObject");
@@ -99,9 +102,7 @@ public class User {
     public CompletableFuture<String> getNickname() {
         return CompletableFuture.supplyAsync(() -> {
             try {
-                String responseJsonString = Request.get("https://chat.slsearch.eu.org/api/user/" + userId + "/").execute().returnContent().asString();
-                JsonObject responseJson = JsonParser.parseString(responseJsonString).getAsJsonObject();
-                return responseJson.get("nickname").getAsString();
+                return getUserDetailsJsonObject().get("nickname").getAsString();
             } catch (IOException e) {
                 if (errorListener != null) {
                     errorListener.onError(e, "getNickname");
@@ -119,9 +120,7 @@ public class User {
     public CompletableFuture<String> getProfileImageUrl() {
         return CompletableFuture.supplyAsync(() -> {
             try {
-                String responseJsonString = Request.get("https://chat.slsearch.eu.org/api/user/" + userId + "/").execute().returnContent().asString();
-                JsonObject responseJson = JsonParser.parseString(responseJsonString).getAsJsonObject();
-                return responseJson.get("profile_img").getAsString();
+                return getUserDetailsJsonObject().get("profile_img").getAsString();
             } catch (IOException e) {
                 if (errorListener != null) {
                     errorListener.onError(e, "getProfileImageUrl");
@@ -139,9 +138,7 @@ public class User {
     public CompletableFuture<long[]> getJoinedServerIds() {
         return CompletableFuture.supplyAsync(() -> {
             try {
-                String responseJsonString = Request.get("https://chat.slsearch.eu.org/api/user/" + userId + "/").execute().returnContent().asString();
-                JsonObject responseJson = JsonParser.parseString(responseJsonString).getAsJsonObject();
-                return responseJson.get("servers").getAsJsonArray().asList().stream().mapToLong(JsonElement::getAsLong).toArray();
+                return getUserDetailsJsonObject().get("servers").getAsJsonArray().asList().stream().mapToLong(JsonElement::getAsLong).toArray();
             } catch (IOException e) {
                 if (errorListener != null) {
                     errorListener.onError(e, "getJoinedServerIds");
@@ -159,9 +156,7 @@ public class User {
     public CompletableFuture<String> getUsername() {
         return CompletableFuture.supplyAsync(() -> {
             try {
-                String responseJsonString = Request.get("https://chat.slsearch.eu.org/api/user/" + userId + "/").execute().returnContent().asString();
-                JsonObject responseJson = JsonParser.parseString(responseJsonString).getAsJsonObject();
-                return responseJson.get("username").getAsString();
+                return getUserDetailsJsonObject().get("username").getAsString();
             } catch (IOException e) {
                 if (errorListener != null) {
                     errorListener.onError(e, "getUsername");
@@ -170,5 +165,23 @@ public class User {
                 return null;
             }
         });
+    }
+
+    /**
+     * Gets whether the user is a bot.
+     * @return A {@link CompletableFuture} containing a {@link Boolean}, that will be completed when the data is received from the API.
+     */
+    public CompletableFuture<Boolean> isBot() {
+        return getLabelJsonObject().thenApplyAsync(jsonObject -> jsonObject.get("name").getAsString().equals("BOT"));
+    }
+
+    /**
+     * Private utility method which get the user details {@link JsonObject} of the user.
+     * @return The user details {@link JsonObject} of the user.
+     * @throws IOException If an I/O error occurs while fetching the data from the API.
+     */
+    private JsonObject getUserDetailsJsonObject() throws IOException {
+        String responseJsonString = Request.get("https://chat.slsearch.eu.org/api/user/" + userId + "/").execute().returnContent().asString();
+        return JsonParser.parseString(responseJsonString).getAsJsonObject();
     }
 }

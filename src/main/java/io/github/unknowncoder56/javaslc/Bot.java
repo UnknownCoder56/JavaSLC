@@ -26,34 +26,58 @@ public class Bot extends User {
     private String prefix;
     private StartListener startListener;
     private final String token;
+    private final ArrayList<MessageListener> messageListeners;
     private final ArrayList<CommandListener> commandListeners;
     private final ArrayList<Long> serverIds = new ArrayList<>();
 
     /**
-     * The enum containing all possible change keys.
-     * PROFILE_IMAGE: The key to change the profile image of the bot.
-     * NICKNAME: The key to change the nickname of the bot.
+     * The enum containing all possible property change keys.
      * @see Bot#change(ChangeKey, String)
      */
     public enum ChangeKey {
-        PROFILE_IMAGE, NICKNAME
+
+        /**
+         * The key to change the profile image of the bot.
+         */
+        PROFILE_IMAGE("profile_img"),
+
+        /**
+         * The key to change the nickname of the bot.
+         */
+        NICKNAME("nickname");
+
+        private final String key;
+
+        ChangeKey(String key) {
+            this.key = key;
+        }
+
+        /**
+         * Gets the key string of the enum value.
+         * @return The key string of the enum value.
+         */
+        public String getKeyString() {
+            return key;
+        }
     }
 
     /**
      * The constructor of the {@link Bot} class. This constructor has default-level access and is only used by the {@link BotBuilder} class.
      */
-    Bot(String prefix, StartListener startListener, ErrorListener errorListener, String token, long userId, ArrayList<CommandListener> commandListeners) {
+    Bot(String prefix, StartListener startListener, ErrorListener errorListener, String token, long userId, ArrayList<MessageListener> messageListeners, ArrayList<CommandListener> commandListeners) {
         super(userId, errorListener);
         this.prefix = prefix;
         this.startListener = startListener;
         this.token = token;
+        this.messageListeners = messageListeners;
         this.commandListeners = commandListeners;
     }
 
     /**
      * The method to run the bot. This method will throw a {@link RuntimeException} if the prefix, token or bot user ID is not set in the {@link BotBuilder} or later in {@link Bot}.
+     * @throws RuntimeException If the prefix, token or bot user ID is not set.
      */
-    public void run() {
+    public void run() throws RuntimeException {
         if (prefix.isEmpty()) {
             throw new RuntimeException("Prefix not set.");
         }
@@ -71,7 +95,7 @@ public class Bot extends User {
             if (startListener != null) {
                 startListener.onStart();
             }
-            Runnable runnable = this::checkForNewCommand;
+            Runnable runnable = this::checkForNewMessage;
             ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
             executor.scheduleAtFixedRate(runnable, 0, 2500, TimeUnit.MILLISECONDS);
         } catch (IOException e) {
@@ -81,9 +105,9 @@ public class Bot extends User {
     }
 
     /**
-     * This method checks for new commands and is private. This method is called every 2.5 seconds by a {@link ScheduledExecutorService} scheduled in the {@link Bot#run()} method.
+     * This private method checks for new messages (or commands). This method is called every 2.5 seconds by a {@link ScheduledExecutorService} scheduled in the {@link Bot#run()} method.
      */
-    private void checkForNewCommand() {
+    private void checkForNewMessage() {
         if (!commandListeners.isEmpty()) {
             for (long serverId : serverIds) {
                 try {
@@ -95,10 +119,12 @@ public class Bot extends User {
                             String[] commandParts = latestMessage.get("content").getAsString().split(" ");
                             if (commandParts.length > 1) {
                                 String[] arguments = Arrays.copyOfRange(commandParts, 1, commandParts.length - 1);
-                                commandListeners.forEach(commandListener -> commandListener.onCommand(new MessageContext(latestMessage, serverId, Bot.this, commandParts[0].substring(1), arguments)));
+                                commandListeners.forEach(commandListener -> commandListener.onCommand(new CommandContext(latestMessage, serverId, Bot.this, commandParts[0].substring(1), arguments)));
                             } else {
-                                commandListeners.forEach(commandListener -> commandListener.onCommand(new MessageContext(latestMessage, serverId, Bot.this, commandParts[0].substring(1))));
+                                commandListeners.forEach(commandListener -> commandListener.onCommand(new CommandContext(latestMessage, serverId, Bot.this, commandParts[0].substring(1))));
                             }
+                        } else {
+                            messageListeners.forEach(messageListener -> messageListener.onMessage(new MessageContext(latestMessage, serverId, Bot.this)));
                         }
                     }
                 } catch (Exception e) {
@@ -112,7 +138,7 @@ public class Bot extends User {
     }
 
     /**
-     * This method sends a message to a server. This method will throw a {@link RuntimeException} if the bot is not in the server. To fix it add it to a server with {@link Bot#join(long)}.
+     * This method sends a message to a server if the bot is in it. If not this method will fail, add it to a server with {@link Bot#join(long)}.
      * @param message The message to send.
      * @param serverId The ID of the server to send the message to.
      * @return A {@link CompletableFuture} that will be completed when the message is sent.
@@ -141,7 +167,7 @@ public class Bot extends User {
     }
 
     /**
-     * This method joins a server. This method will throw a {@link RuntimeException} if the bot is already in the server.
+     * This method joins a server if not already joined by the bot.
      * @param serverId The ID of the server to join.
      * @return A {@link CompletableFuture} that will be completed when the bot has joined the server.
      */
@@ -172,36 +198,25 @@ public class Bot extends User {
 
     /**
      * This method changes a bot property defined in the {@link ChangeKey} enum.
-     * @param changeKey The key of the value to change.
+     * @param changeKey The key of the property to change.
      * @param changeValue The value to change the key to.
      * @return A {@link CompletableFuture} that will be completed when the value is changed.
      * @see ChangeKey
      */
     public CompletableFuture<Void> change(ChangeKey changeKey, String changeValue) {
         return CompletableFuture.runAsync(() -> {
-            String changeKeyString;
-            switch (changeKey) {
-                case PROFILE_IMAGE:
-                    changeKeyString = "profile_image";
-                    break;
-                case NICKNAME:
-                    changeKeyString = "nickname";
-                    break;
-                default:
-                    throw new RuntimeException("Invalid change key.");
-            }
             try {
                 Request.post("https://chat.slsearch.eu.org/api/change").bodyForm(() -> Arrays.asList(
-                        (NameValuePair) new BasicNameValuePair("change_key", changeKeyString),
+                        (NameValuePair) new BasicNameValuePair("change_key", changeKey.getKeyString()),
                         new BasicNameValuePair("change_value", changeValue),
                         new BasicNameValuePair("token", token)
                 ).iterator()).addHeader("Content-Type", "application/x-www-form-urlencoded").execute();
-                System.out.println("Changed key " + changeKey + " into " + changeValue);
+                System.out.println("Changed key " + changeKey.name() + " into " + changeValue);
             } catch (Exception e) {
                 if (errorListener != null) {
                     errorListener.onError(e, "change");
                 }
-                System.out.println("Failed to change key " + changeKey + " into " + changeValue);
+                System.out.println("Failed to change key " + changeKey.name() + " into " + changeValue);
             }
         });
     }
@@ -244,6 +259,22 @@ public class Bot extends User {
      */
     public long getBotUserId() {
         return userId;
+    }
+
+    /**
+     * Gets the list of {@link MessageListener}s of the bot.
+     * @return An {@link ArrayList} containing the {@link MessageListener}s of the bot.
+     */
+    public ArrayList<MessageListener> getMessageListeners() {
+        return messageListeners;
+    }
+
+    /**
+     * Adds a {@link MessageListener} to the bot.
+     * @param messageListener The {@link MessageListener} to add.
+     */
+    public void addMessageListener(MessageListener messageListener) {
+        messageListeners.add(messageListener);
     }
 
     /**
