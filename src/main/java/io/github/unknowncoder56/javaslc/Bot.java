@@ -16,6 +16,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * The main class of the library containing all important methods, like to run the bot. This class cannot be instantiated directly, use {@link BotBuilder} instead.
+ * @see BotBuilder
+ * @see User
+ */
 public class Bot extends User {
 
     private String prefix;
@@ -24,10 +29,19 @@ public class Bot extends User {
     private final ArrayList<CommandListener> commandListeners;
     private final ArrayList<Long> serverIds = new ArrayList<>();
 
+    /**
+     * The enum containing all possible change keys.
+     * PROFILE_IMAGE: The key to change the profile image of the bot.
+     * NICKNAME: The key to change the nickname of the bot.
+     * @see Bot#change(ChangeKey, String)
+     */
     public enum ChangeKey {
         PROFILE_IMAGE, NICKNAME
     }
 
+    /**
+     * The constructor of the {@link Bot} class. This constructor has default-level access and is only used by the {@link BotBuilder} class.
+     */
     Bot(String prefix, StartListener startListener, ErrorListener errorListener, String token, long userId, ArrayList<CommandListener> commandListeners) {
         super(userId, errorListener);
         this.prefix = prefix;
@@ -36,6 +50,9 @@ public class Bot extends User {
         this.commandListeners = commandListeners;
     }
 
+    /**
+     * The method to run the bot. This method will throw a {@link RuntimeException} if the prefix, token or bot user ID is not set in the {@link BotBuilder} or later in {@link Bot}.
+     */
     public void run() {
         if (prefix.isEmpty()) {
             throw new RuntimeException("Prefix not set.");
@@ -63,6 +80,9 @@ public class Bot extends User {
         }
     }
 
+    /**
+     * This method checks for new commands and is private. This method is called every 2.5 seconds by a {@link ScheduledExecutorService} scheduled in the {@link Bot#run()} method.
+     */
     private void checkForNewCommand() {
         if (!commandListeners.isEmpty()) {
             for (long serverId : serverIds) {
@@ -91,6 +111,13 @@ public class Bot extends User {
         }
     }
 
+    /**
+     * This method sends a message to a server. This method will throw a {@link RuntimeException} if the bot is not in the server. To fix it add it to a server with {@link Bot#join(long)}.
+     * @param message The message to send.
+     * @param serverId The ID of the server to send the message to.
+     * @return A {@link CompletableFuture} that will be completed when the message is sent.
+     * @see Bot#join(long)
+     */
     public CompletableFuture<Void> send(String message, long serverId) {
         return CompletableFuture.runAsync(() -> {
             if (serverIds.contains(serverId)) {
@@ -113,6 +140,11 @@ public class Bot extends User {
         });
     }
 
+    /**
+     * This method joins a server. This method will throw a {@link RuntimeException} if the bot is already in the server.
+     * @param serverId The ID of the server to join.
+     * @return A {@link CompletableFuture} that will be completed when the bot has joined the server.
+     */
     public CompletableFuture<Void> join(long serverId) {
         return CompletableFuture.runAsync(() -> {
             if (!serverIds.contains(serverId)) {
@@ -138,6 +170,13 @@ public class Bot extends User {
         });
     }
 
+    /**
+     * This method changes a bot property defined in the {@link ChangeKey} enum.
+     * @param changeKey The key of the value to change.
+     * @param changeValue The value to change the key to.
+     * @return A {@link CompletableFuture} that will be completed when the value is changed.
+     * @see ChangeKey
+     */
     public CompletableFuture<Void> change(ChangeKey changeKey, String changeValue) {
         return CompletableFuture.runAsync(() -> {
             String changeKeyString;
@@ -167,30 +206,58 @@ public class Bot extends User {
         });
     }
 
+    /**
+     * Gets the prefix of the bot.
+     * @return The prefix of the bot.
+     */
     public String getPrefix() {
         return prefix;
     }
 
+    /**
+     * Sets the prefix of the bot.
+     * @param prefix The prefix to set.
+     */
     public void setPrefix(String prefix) {
         this.prefix = prefix;
     }
 
+    /**
+     * Gets the {@link StartListener} of the bot.
+     * @return The {@link StartListener} of the bot.
+     */
     public StartListener getStartListener() {
         return startListener;
     }
 
+    /**
+     * Sets the {@link StartListener} of the bot.
+     * @param startListener The {@link StartListener} to set.
+     */
     public void setStartListener(StartListener startListener) {
         this.startListener = startListener;
     }
 
+    /**
+     * Gets the user ID of the bot.
+     * @return The user ID of the bot.
+     */
     public long getBotUserId() {
         return userId;
     }
 
+    /**
+     * Gets the list of {@link CommandListener}s of the bot.
+     * @return An {@link ArrayList} containing the {@link CommandListener}s of the bot.
+     */
     public ArrayList<CommandListener> getCommandListeners() {
         return commandListeners;
     }
 
+    /**
+     * Adds a {@link CommandListener} to the bot.
+     * @param commandListener The {@link CommandListener} to add.
+     */
     public void addCommandListener(CommandListener commandListener) {
         commandListeners.add(commandListener);
     }
