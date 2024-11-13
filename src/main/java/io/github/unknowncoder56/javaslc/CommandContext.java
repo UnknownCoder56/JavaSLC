@@ -17,7 +17,7 @@ public class CommandContext extends MessageContext {
      * @param bot The {@link Bot} instance receiving the message event.
      * @param command The command name of the command issued by the user.
      */
-    public CommandContext(JsonObject message, long serverId, Bot bot, String command) {
+    public CommandContext(JsonObject message, String serverId, Bot bot, String command) {
         super(message, serverId, bot);
         this.command = command;
         this.arguments = new String[]{};
@@ -31,7 +31,7 @@ public class CommandContext extends MessageContext {
      * @param command The command name of the command issued by the user.
      * @param arguments An array of the command arguments.
      */
-    public CommandContext(JsonObject message, long serverId, Bot bot, String command, String[] arguments) {
+    public CommandContext(JsonObject message, String serverId, Bot bot, String command, String[] arguments) {
         super(message, serverId, bot);
         this.command = command;
         this.arguments = arguments;
@@ -39,6 +39,7 @@ public class CommandContext extends MessageContext {
 
     /**
      * Gets the command name of the command received.
+     * Note: The command name does not contain the bot prefix.
      * @return The command name of the command received.
      */
     public String getCommand() {

@@ -11,7 +11,7 @@ public class BotBuilder {
     private StartListener startListener = null;
     private ErrorListener errorListener = null;
     private String token = "";
-    private long botUserId = 0;
+    private String botUserId = "";
     private final ArrayList<MessageListener> messageListeners = new ArrayList<>();
     private final ArrayList<CommandListener> commandListeners = new ArrayList<>();
 
@@ -78,7 +78,7 @@ public class BotBuilder {
      * @param botUserId The bot user ID.
      * @return The {@link BotBuilder} instance to facilitate chaining of method calls.
      */
-    public BotBuilder setBotUserId(long botUserId) {
+    public BotBuilder setBotUserId(String botUserId) {
         this.botUserId = botUserId;
         return this;
     }

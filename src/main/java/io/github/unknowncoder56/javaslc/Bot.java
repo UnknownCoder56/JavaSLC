@@ -1,18 +1,27 @@
 package io.github.unknowncoder56.javaslc;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import org.apache.hc.client5.http.fluent.Request;
+import io.socket.client.IO;
+import io.socket.client.Socket;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.cookie.BasicCookieStore;
+import org.apache.hc.client5.http.entity.UrlEncodedFormEntity;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
+import org.apache.hc.client5.http.impl.cookie.BasicClientCookie;
+import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.http.message.BasicNameValuePair;
+import org.json.JSONObject;
 
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 /**
  * The main class of the library containing all important methods, like to run the bot. This class cannot be instantiated directly, use {@link BotBuilder} instead.
@@ -26,8 +35,7 @@ public class Bot extends User {
     private final String token;
     private final ArrayList<MessageListener> messageListeners;
     private final ArrayList<CommandListener> commandListeners;
-    private final ArrayList<Long> serverIds = new ArrayList<>();
-    private final Map<Long, String> latestMessageTimesPerServer = new HashMap<>();
+    private final Map<String, Socket> serverMap = new HashMap<>();
 
     /**
      * The enum containing all possible property change keys.
@@ -63,7 +71,7 @@ public class Bot extends User {
     /**
      * The constructor of the {@link Bot} class. This constructor has default-level access and is only used by the {@link BotBuilder} class.
      */
-    Bot(String prefix, StartListener startListener, ErrorListener errorListener, String token, long userId, ArrayList<MessageListener> messageListeners, ArrayList<CommandListener> commandListeners) {
+    Bot(String prefix, StartListener startListener, ErrorListener errorListener, String token, String userId, ArrayList<MessageListener> messageListeners, ArrayList<CommandListener> commandListeners) {
         super(userId, errorListener);
         this.prefix = prefix;
         this.startListener = startListener;
@@ -74,6 +82,7 @@ public class Bot extends User {
 
     /**
      * The method to run the bot. This method will throw a {@link RuntimeException} if the prefix, token or bot user ID is not set in the {@link BotBuilder} or later in {@link Bot}.
+     * Note: This is a blocking method. Use it as the last method call in your thread.
      * @throws RuntimeException If the prefix, token or bot user ID is not set.
      */
     public void run() throws RuntimeException {
@@ -83,87 +92,84 @@ public class Bot extends User {
         if (token.isEmpty()) {
             throw new RuntimeException("Token not set.");
         }
-        if (userId == 0) {
+        if (userId.isEmpty()) {
             throw new RuntimeException("Bot user ID not set.");
         }
-        try {
-            String responseJsonString = Request.get("https://chat.slsearch.eu.org/api/user/" + userId + "/").execute().returnContent().asString();
+        try (CloseableHttpClient client = HttpClientBuilder.create().build()) {
+            String responseJsonString = client.execute(new HttpGet("https://slchat.alwaysdata.net/api/user/" + userId + "/"), classicHttpResponse -> new String(classicHttpResponse.getEntity().getContent().readAllBytes()));
             JsonObject responseJson = JsonParser.parseString(responseJsonString).getAsJsonObject();
             JsonArray servers = responseJson.getAsJsonArray("servers");
-            servers.forEach(server -> serverIds.add(Long.parseLong(server.getAsString())));
+            for (JsonElement server : servers) {
+                String serverId = server.getAsString();
+                if (!serverMap.containsKey(serverId)) {
+                    makeSocketForServer(serverId);
+                }
+            }
             if (startListener != null) {
                 startListener.onStart();
             }
-            Runnable runnable = this::checkForNewMessage;
-            ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
-            executor.scheduleAtFixedRate(runnable, 0, 2500, TimeUnit.MILLISECONDS);
+            while (true) {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
         } catch (IOException e) {
-            errorListener.onError(e, "run");
+            if (errorListener != null) {
+                errorListener.onError(e, "run");
+            }
             System.out.println("Failed to start bot: " + e.getMessage());
         }
     }
 
     /**
-     * This private method checks for new messages (or commands). This method is called every 2.5 seconds by a {@link ScheduledExecutorService} scheduled in the {@link Bot#run()} method.
+     * This private method handles new messages (and commands). This method is called by socket event handlers for each server.
      */
-    private void checkForNewMessage() {
-        if (!commandListeners.isEmpty()) {
-            for (long serverId : serverIds) {
-                try {
-                    String responseJsonString = Request.get("https://chat.slsearch.eu.org/api/server/" + serverId + "/").execute().returnContent().asString();
-                    JsonArray messages = JsonParser.parseString(responseJsonString).getAsJsonObject().get("messages").getAsJsonArray();
-                    JsonObject latestMessage = messages.get(messages.size() - 1).getAsJsonObject();
-                    if (latestMessageTimesPerServer.containsKey(serverId)) {
-                        if (!Objects.equals(latestMessageTimesPerServer.get(serverId), latestMessage.get("date").getAsString())) {
-                            latestMessageTimesPerServer.replace(serverId, latestMessage.get("date").getAsString());
-                        } else {
-                            continue;
-                        }
+    private void handleMessage(JsonObject prompt) {
+        JsonObject message = prompt.get("message").getAsJsonObject();
+        String serverId = prompt.get("server_id").getAsString();
+        try {
+            if (!Objects.equals(message.get("owner").getAsString(), getBotUserId())) {
+                if (message.get("content").getAsString().startsWith(prefix)) {
+                    String[] commandParts = message.get("content").getAsString().split(" ");
+                    if (commandParts.length > 1) {
+                        String[] arguments = Arrays.copyOfRange(commandParts, 1, commandParts.length - 1);
+                        commandListeners.forEach(commandListener -> commandListener.onCommand(new CommandContext(message, serverId, Bot.this, commandParts[0].substring(1), arguments)));
                     } else {
-                        latestMessageTimesPerServer.put(serverId, latestMessage.get("date").getAsString());
+                        commandListeners.forEach(commandListener -> commandListener.onCommand(new CommandContext(message, serverId, Bot.this, commandParts[0].substring(1))));
                     }
-                    if (!Objects.equals(latestMessage.get("owner").getAsString(), String.valueOf(userId))) {
-                        if (latestMessage.get("content").getAsString().startsWith(prefix)) {
-                            String[] commandParts = latestMessage.get("content").getAsString().split(" ");
-                            if (commandParts.length > 1) {
-                                String[] arguments = Arrays.copyOfRange(commandParts, 1, commandParts.length - 1);
-                                commandListeners.forEach(commandListener -> commandListener.onCommand(new CommandContext(latestMessage, serverId, Bot.this, commandParts[0].substring(1), arguments)));
-                            } else {
-                                commandListeners.forEach(commandListener -> commandListener.onCommand(new CommandContext(latestMessage, serverId, Bot.this, commandParts[0].substring(1))));
-                            }
-                        } else {
-                            messageListeners.forEach(messageListener -> messageListener.onMessage(new MessageContext(latestMessage, serverId, Bot.this)));
-                        }
-                    }
-                } catch (Exception e) {
-                    if (errorListener != null) {
-                        errorListener.onError(e, "checkNewCommand");
-                    }
-                    System.out.println("Failed to fetch server data of " + serverId);
                 }
             }
+            messageListeners.forEach(messageListener -> messageListener.onMessage(new MessageContext(message, serverId, Bot.this)));
+        } catch (Exception e) {
+            if (errorListener != null) {
+                errorListener.onError(e, "checkNewCommand");
+            }
+            System.out.println("Failed to handle message from server " + serverId + ": " + e.getMessage());
         }
     }
 
     /**
-     * This method sends a message to a server if the bot is in it. If not this method will fail, add it to a server with {@link Bot#join(long)}.
+     * This method sends a message to a server if the bot is in it. If not this method will fail, add it to a server with {@link Bot#join(String)}.
      * @param message The message to send.
      * @param serverId The ID of the server to send the message to.
      * @return A {@link CompletableFuture} that will be completed when the message is sent.
-     * @see Bot#join(long)
+     * @see Bot#join(String)
      */
-    public CompletableFuture<Void> send(String message, long serverId) {
+    public CompletableFuture<Void> send(String message, String serverId) {
         return CompletableFuture.runAsync(() -> {
-            if (serverIds.contains(serverId)) {
+            if (serverMap.containsKey(serverId)) {
                 try {
-                    Request.post("https://chat.slsearch.eu.org/api/send").bodyForm(() -> Arrays.asList(
-                            (NameValuePair) new BasicNameValuePair("message", message),
-                            new BasicNameValuePair("server_id", String.valueOf(serverId)),
-                            new BasicNameValuePair("token", token)
-                    ).iterator()).addHeader("Content-Type", "application/x-www-form-urlencoded").execute();
+                    JSONObject payload = new JSONObject();
+                    payload.put("content", message);
+                    payload.put("server_id", serverId);
+                    payload.put("token", token);
+                    payload.put("op", getBotUserId());
+                    serverMap.get(serverId).emit("message", payload);
                 } catch (Exception e) {
                     errorListener.onError(e, "send");
-                    System.out.println("Failed to send message to server " + serverId);
+                    System.out.println("Failed to send message to server " + serverId + ": " + e.getMessage());
                 }
             } else {
                 if (errorListener != null) {
@@ -179,21 +185,36 @@ public class Bot extends User {
      * @param serverId The ID of the server to join.
      * @return A {@link CompletableFuture} that will be completed when the bot has joined the server.
      */
-    public CompletableFuture<Void> join(long serverId) {
+    public CompletableFuture<Void> join(String serverId) {
         return CompletableFuture.runAsync(() -> {
-            if (!serverIds.contains(serverId)) {
-                try {
-                    Request.post("https://chat.slsearch.eu.org/api/new_server").bodyForm(() -> Arrays.asList(
-                            (NameValuePair) new BasicNameValuePair("server_id", String.valueOf(serverId)),
-                            new BasicNameValuePair("token", token)
-                    ).iterator()).addHeader("Content-Type", "application/x-www-form-urlencoded").execute();
-                    serverIds.add(serverId);
-                    System.out.println("Current server IDs: " + serverIds);
+            if (!serverMap.containsKey(serverId)) {
+                BasicCookieStore cookieStore = new BasicCookieStore();
+                BasicClientCookie tokenCookie = new BasicClientCookie("token", token);
+                tokenCookie.setDomain("slchat.alwaysdata.net");
+                tokenCookie.setAttribute("domain", "true");
+                tokenCookie.setPath("/");
+                BasicClientCookie opCookie = new BasicClientCookie("op", getBotUserId());
+                opCookie.setDomain("slchat.alwaysdata.net");
+                opCookie.setAttribute("domain", "true");
+                opCookie.setPath("/");
+                cookieStore.addCookie(tokenCookie);
+                cookieStore.addCookie(opCookie);
+                try (CloseableHttpClient client = HttpClientBuilder.create().setDefaultCookieStore(cookieStore).build()) {
+                    HttpPost post = new HttpPost("https://slchat.alwaysdata.net/api/new_server");
+                    post.setEntity(new UrlEncodedFormEntity(List.of((NameValuePair) new BasicNameValuePair("server_id", serverId))));
+                    post.setHeader("Content-Type", "application/x-www-form-urlencoded");
+                    ClassicHttpResponse response = client.execute(post, classicHttpResponse -> classicHttpResponse);
+                    int code = response.getCode();
+                    if ((400 <= code && code < 500) || (500 <= code && code < 600)) {
+                        throw new Exception("(" + code + ") " + response.getReasonPhrase());
+                    }
+                    makeSocketForServer(serverId);
+                    System.out.println("Current server IDs: " + serverMap.keySet());
                 } catch (Exception e) {
                     if (errorListener != null) {
                         errorListener.onError(e, "join");
                     }
-                    System.out.println("Failed to join server " + serverId);
+                    System.out.println("Failed to join server " + serverId + ": " + e.getMessage());
                 }
             } else {
                 if (errorListener != null) {
@@ -213,18 +234,37 @@ public class Bot extends User {
      */
     public CompletableFuture<Void> change(ChangeKey changeKey, String changeValue) {
         return CompletableFuture.runAsync(() -> {
-            try {
-                Request.post("https://chat.slsearch.eu.org/api/change").bodyForm(() -> Arrays.asList(
+            BasicCookieStore cookieStore = new BasicCookieStore();
+            BasicClientCookie tokenCookie = new BasicClientCookie("token", token);
+            tokenCookie.setDomain("slchat.alwaysdata.net");
+            tokenCookie.setAttribute("domain", "true");
+            tokenCookie.setPath("/");
+            BasicClientCookie opCookie = new BasicClientCookie("op", getBotUserId());
+            opCookie.setDomain("slchat.alwaysdata.net");
+            opCookie.setAttribute("domain", "true");
+            opCookie.setPath("/");
+            cookieStore.addCookie(tokenCookie);
+            cookieStore.addCookie(opCookie);
+            try (CloseableHttpClient client = HttpClientBuilder.create().setDefaultCookieStore(cookieStore).build()) {
+                HttpPost post = new HttpPost("https://slchat.alwaysdata.net/api/change");
+                post.setEntity(new UrlEncodedFormEntity(Arrays.asList(
                         (NameValuePair) new BasicNameValuePair("change_key", changeKey.getKeyString()),
                         new BasicNameValuePair("change_value", changeValue),
-                        new BasicNameValuePair("token", token)
-                ).iterator()).addHeader("Content-Type", "application/x-www-form-urlencoded").execute();
+                        new BasicNameValuePair("token", token),
+                        new BasicNameValuePair("op", getBotUserId())
+                )));
+                post.setHeader("Content-Type", "application/x-www-form-urlencoded");
+                ClassicHttpResponse response = client.execute(post, classicHttpResponse -> classicHttpResponse);
+                int code = response.getCode();
+                if ((400 <= code && code < 500) || (500 <= code && code < 600)) {
+                    throw new Exception("(" + code + ") " + response.getReasonPhrase());
+                }
                 System.out.println("Changed key " + changeKey.name() + " into " + changeValue);
             } catch (Exception e) {
                 if (errorListener != null) {
                     errorListener.onError(e, "change");
                 }
-                System.out.println("Failed to change key " + changeKey.name() + " into " + changeValue);
+                System.out.println("Failed to change key " + changeKey.name() + " into " + changeValue + ": " + e.getMessage());
             }
         });
     }
@@ -265,7 +305,7 @@ public class Bot extends User {
      * Gets the user ID of the bot.
      * @return The user ID of the bot.
      */
-    public long getBotUserId() {
+    public String getBotUserId() {
         return userId;
     }
 
@@ -299,5 +339,23 @@ public class Bot extends User {
      */
     public void addCommandListener(CommandListener commandListener) {
         commandListeners.add(commandListener);
+    }
+
+    /**
+     * Private utility method to make socket and socket event handler for server, then connect it and add it to socket map.
+     * @param serverId The ID of the server to make the socket for.
+     */
+    private void makeSocketForServer(String serverId) {
+        try {
+            Socket socket = IO.socket("https://slchat.alwaysdata.net?server_id=" + serverId);
+            socket.on("prompt", objects -> handleMessage(JsonParser.parseString(objects[0].toString()).getAsJsonObject()));
+            socket.connect();
+            serverMap.put(serverId, socket);
+        } catch (URISyntaxException e) {
+            if (errorListener != null) {
+                errorListener.onError(e, "makeSocketForServer");
+            }
+            System.out.println("Failed to make socket for server " + serverId);
+        }
     }
 }

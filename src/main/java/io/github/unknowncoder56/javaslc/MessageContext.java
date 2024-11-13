@@ -11,7 +11,7 @@ public class MessageContext {
 
     private final String content;
     private final User owner;
-    private final long serverId;
+    private final String serverId;
     private final Bot bot;
 
     /**
@@ -20,18 +20,18 @@ public class MessageContext {
      * @param serverId The ID of the server where the message was sent.
      * @param bot The {@link Bot} instance receiving the message event.
      */
-    public MessageContext(JsonObject message, long serverId, Bot bot) {
+    public MessageContext(JsonObject message, String serverId, Bot bot) {
         content = message.get("content").getAsString();
-        owner = new User(message.get("owner").getAsLong(), bot.getErrorListener());
+        owner = new User(message.get("owner").getAsString(), bot.getErrorListener());
         this.serverId = serverId;
         this.bot = bot;
     }
 
     /**
-     * This method sends a message to a server directly from where the message originated. This method will throw a {@link RuntimeException} if the bot is not in the server. To fix it add it to a server with {@link Bot#join(long)}.
+     * This method sends a message to a server directly from where the message originated. This method will throw a {@link RuntimeException} if the bot is not in the server. To fix it add it to a server with {@link Bot#join(String)}.
      * @param message The message to send.
      * @return A {@link CompletableFuture} that will be completed when the message is sent.
-     * @see Bot#send(String, long)
+     * @see Bot#send(String, String)
      */
     public CompletableFuture<Void> send(String message) {
         return bot.send(message, serverId);
@@ -57,7 +57,7 @@ public class MessageContext {
      * Gets the server ID of the server where the message was sent.
      * @return The server ID of the server where the message was sent.
      */
-    public long getServerId() {
+    public String getServerId() {
         return serverId;
     }
 

@@ -3,7 +3,9 @@ package io.github.unknowncoder56.javaslc;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import org.apache.hc.client5.http.fluent.Request;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -17,7 +19,7 @@ public class User {
     /**
      * The user ID of the user.
      */
-    protected final long userId;
+    protected final String userId;
 
     /**
      * The {@link ErrorListener} for the instance.
@@ -30,7 +32,7 @@ public class User {
      * @param errorListener The {@link ErrorListener} for the instance.
      * @see ErrorListener
      */
-    public User(long userId, ErrorListener errorListener) {
+    public User(String userId, ErrorListener errorListener) {
         this.userId = userId;
         this.errorListener = errorListener;
     }
@@ -39,7 +41,7 @@ public class User {
      * Gets the user ID of the user.
      * @return The user ID of the user.
      */
-    public long getUserId() {
+    public String getUserId() {
         return userId;
     }
 
@@ -181,7 +183,9 @@ public class User {
      * @throws IOException If an I/O error occurs while fetching the data from the API.
      */
     private JsonObject getUserDetailsJsonObject() throws IOException {
-        String responseJsonString = Request.get("https://chat.slsearch.eu.org/api/user/" + userId + "/").execute().returnContent().asString();
-        return JsonParser.parseString(responseJsonString).getAsJsonObject();
+        try (CloseableHttpClient client = HttpClientBuilder.create().build()) {
+            String responseJsonString = client.execute(new HttpGet("https://slchat.alwaysdata.net/api/user/" + userId + "/"), classicHttpResponse -> new String(classicHttpResponse.getEntity().getContent().readAllBytes()));
+            return JsonParser.parseString(responseJsonString).getAsJsonObject();
+        }
     }
 }
