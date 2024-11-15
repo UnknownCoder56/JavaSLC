@@ -347,7 +347,7 @@ public class Bot extends User {
      */
     private void makeSocketForServer(String serverId) {
         try {
-            Socket socket = IO.socket("https://slchat.alwaysdata.net?server_id=" + serverId);
+            Socket socket = IO.socket("https://slchat.alwaysdata.net?server=" + serverId + "&user=" + getBotUserId());
             socket.on("prompt", objects -> handleMessage(JsonParser.parseString(objects[0].toString()).getAsJsonObject()));
             socket.connect();
             serverMap.put(serverId, socket);
