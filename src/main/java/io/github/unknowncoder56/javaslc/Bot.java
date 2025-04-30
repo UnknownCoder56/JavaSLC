@@ -131,8 +131,8 @@ public class Bot extends User {
         String serverId = prompt.get("server_id").getAsString();
         try {
             if (!Objects.equals(message.get("owner").getAsString(), getBotUserId())) {
-                if (message.get("content").getAsString().startsWith(prefix)) {
-                    String[] commandParts = message.get("content").getAsString().split(" ");
+                if (message.get("text").getAsString().startsWith(prefix)) {
+                    String[] commandParts = message.get("text").getAsString().split(" ");
                     if (commandParts.length > 1) {
                         String[] arguments = Arrays.copyOfRange(commandParts, 1, commandParts.length - 1);
                         commandListeners.forEach(commandListener -> commandListener.onCommand(new CommandContext(message, serverId, Bot.this, commandParts[0].substring(1), arguments)));
@@ -162,7 +162,7 @@ public class Bot extends User {
             if (serverMap.containsKey(serverId)) {
                 try {
                     JSONObject payload = new JSONObject();
-                    payload.put("content", message);
+                    payload.put("text", message);
                     payload.put("server_id", serverId);
                     payload.put("token", token);
                     payload.put("op", getBotUserId());
