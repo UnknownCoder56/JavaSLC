@@ -17,7 +17,7 @@ import java.util.concurrent.CompletableFuture;
 public class User {
 
     /**
-     * The user ID of the user.
+     * The ID of the user.
      */
     protected final String userId;
 
@@ -28,7 +28,7 @@ public class User {
 
     /**
      * Constructor to build a user.
-     * @param userId The user's user ID.
+     * @param userId The user's ID.
      * @param errorListener The {@link ErrorListener} for the instance.
      * @see ErrorListener
      */
@@ -38,8 +38,8 @@ public class User {
     }
 
     /**
-     * Gets the user ID of the user.
-     * @return The user ID of the user.
+     * Gets the ID of the user.
+     * @return The ID of the user.
      */
     public String getUserId() {
         return userId;

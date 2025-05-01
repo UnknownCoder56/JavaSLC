@@ -22,7 +22,7 @@ public class MessageContext {
      */
     public MessageContext(JsonObject message, String serverId, Bot bot) {
         text = message.get("text").getAsString();
-        owner = new User(message.get("owner").getAsString(), bot.getErrorListener());
+        owner = new User(message.get("owner").getAsJsonObject().get("id").getAsString(), bot.getErrorListener());
         this.serverId = serverId;
         this.bot = bot;
     }

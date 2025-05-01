@@ -130,7 +130,7 @@ public class Bot extends User {
         JsonObject message = prompt.get("message").getAsJsonObject();
         String serverId = prompt.get("server_id").getAsString();
         try {
-            if (!Objects.equals(message.get("owner").getAsString(), getBotUserId())) {
+            if (!Objects.equals(message.get("owner").getAsJsonObject().get("id").getAsString(), getBotUserId())) {
                 if (message.get("text").getAsString().startsWith(prefix)) {
                     String[] commandParts = message.get("text").getAsString().split(" ");
                     if (commandParts.length > 1) {
@@ -342,7 +342,7 @@ public class Bot extends User {
     }
 
     /**
-     * Private utility method to make socket and socket event handler for server, then connect it and add it to socket map.
+     * Private utility method to make socket and socket event handler for a server, then connect it and add it to the socket map.
      * @param serverId The ID of the server to make the socket for.
      */
     private void makeSocketForServer(String serverId) {
