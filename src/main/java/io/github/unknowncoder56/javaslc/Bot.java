@@ -151,18 +151,18 @@ public class Bot extends User {
     }
 
     /**
-     * This method sends a message to a server if the bot is in it. If not this method will fail, add it to a server with {@link Bot#join(String)}.
-     * @param message The message to send.
+     * This method sends a message text to a server if the bot is in it. If not this method will fail, add it to a server with {@link Bot#join(String)}.
+     * @param text The text to send.
      * @param serverId The ID of the server to send the message to.
      * @return A {@link CompletableFuture} that will be completed when the message is sent.
      * @see Bot#join(String)
      */
-    public CompletableFuture<Void> send(String message, String serverId) {
+    public CompletableFuture<Void> send(String text, String serverId) {
         return CompletableFuture.runAsync(() -> {
             if (serverMap.containsKey(serverId)) {
                 try {
                     JSONObject payload = new JSONObject();
-                    payload.put("text", message);
+                    payload.put("text", text);
                     payload.put("server_id", serverId);
                     payload.put("token", token);
                     payload.put("op", getBotUserId());

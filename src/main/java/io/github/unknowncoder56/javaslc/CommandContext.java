@@ -3,7 +3,7 @@ package io.github.unknowncoder56.javaslc;
 import com.google.gson.JsonObject;
 
 /**
- * A class to create a context object which contains details about the command like message content, owner (author), server ID, {@link Bot} instance, command name and command arguments.
+ * A class to create a context object which contains details about the command like message, owner (author), server ID, {@link Bot} instance, command name and command arguments.
  */
 public class CommandContext extends MessageContext {
 

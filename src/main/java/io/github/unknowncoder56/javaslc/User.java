@@ -134,7 +134,7 @@ public class User {
     }
 
     /**
-     * Gets the array of server IDs of the servers joined by the user.
+     * Gets the IDs of the servers joined by the user.
      * @return A {@link CompletableFuture} containing the array of IDs, that will be completed when the data is received from the API.
      */
     public CompletableFuture<long[]> getJoinedServerIds() {
@@ -178,7 +178,7 @@ public class User {
     }
 
     /**
-     * Private utility method which get the user details {@link JsonObject} of the user.
+     * Private utility method that gets the user details {@link JsonObject} of the user.
      * @return The user details {@link JsonObject} of the user.
      * @throws IOException If an I/O error occurs while fetching the data from the API.
      */
